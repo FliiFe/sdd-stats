@@ -22,7 +22,7 @@ client.on('ready', () => {
         });
         console.log('\r' + chan.name, 'fetched');
         process.stdout.write(Object.keys(sddMessages).length + '/' + chans.size);
-        if (Object.keys(sddMessages).length === chans.length) {
+        if (Object.keys(sddMessages).length === chans.size) {
             process.stdout.write('\nWriting file...');
             fs.writeFileSync('./sddMessages.json', JSON.stringify(sddMessages));
             console.log(' DONE');
