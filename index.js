@@ -23,8 +23,9 @@ client.on('ready', () => {
         console.log('\r' + chan.name, 'fetched');
         process.stdout.write(Object.keys(sddMessages).length + '/' + chans.size);
         if (Object.keys(sddMessages).length === chans.length) {
+            process.stdout.write('\nWriting file...');
             fs.writeFileSync('./sddMessages.json', JSON.stringify(sddMessages));
-            process.stdout.write('\n');
+            console.log(' DONE');
             process.exit(0);
         }
     }));
