@@ -148,7 +148,7 @@ const displayRanking = ranking => {
         console.log(verticalDelimiter
             + ' '.repeat(Math.floor((maxLength-username.length)/2))
             + username
-            + ' '.repeat(Math.ceil((maxLength-username.length)/2)) 
+            + ' '.repeat(Math.ceil((maxLength-username.length)/2))
             + verticalDelimiter + ' '
             + messages
             + ' '.repeat(maxAmount.toString().length - messages.toString().length + 1)
