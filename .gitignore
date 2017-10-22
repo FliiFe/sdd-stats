@@ -1,4 +1,7 @@
 node_modules
 tags
+tags*
 sddMessages.json
 lastWeekStats.json
+tokens.json
+membersInfos.json

@@ -1,20 +1,22 @@
 const fs = require('fs');
 const Discord = require('discord.js');
-const client = new Discord.Client();
+const bot = new Discord.Client();
+const user = new Discord.Client();
+const tokens = JSON.parse(fs.readFileSync('./tokens.json').toString());
 
-client.login(process.env.DISCORD_TOKEN);
+user.login(tokens.user);
 
 let sddMessages = {};
 let fetchedCount = 0;
 
-client.on('ready', () => {
+bot.on('ready', () => {
     console.log('Connected');
     if (fs.existsSync('./sddMessages.json')) {
         console.log('loading existing messages from sddMessages.json');
         sddMessages = JSON.parse(fs.readFileSync('./sddMessages.json'));
     }
     /** @type {Discord.Guild} */
-    const sdd = client.guilds.filter(e => e.name === 'Salon des développeurs').first();
+    const sdd = bot.guilds.filter(e => e.name === 'Salon des développeurs').first();
     /* @type {Discord.Collection} */
     const chans = sdd.channels.filter(e => e instanceof Discord.TextChannel && e.name !== 'bots' && e.id !== '214888058862960651');
     chans.map(chan => fetchAfter(chan, sddMessages[chan.name], messages => {
@@ -119,12 +121,35 @@ const fetchAllMessages = (channel, callback) => {
 const doStats = (channels) => {
     const now = Date.now();
     const messages = Object.keys(channels).map(channel => channels[channel]).reduce((acc, val) => acc.concat(val), []);
-    const lastWeekMessages = messages.filter(({date}) => now - date < 7 * 24 * 60 * 60 * 1000);
-    const authorActivity = lastWeekMessages.reduce((acc, msg) => ({...acc, [msg.author]: (acc[msg.author] || 0) + 1}), {});
-    const authorActivityArray = Object.keys(authorActivity).map(author => ({author, messages: authorActivity[author]}));
-    const ranking = authorActivityArray.sort(({messages: a}, {messages: b}) => b - a).slice(0, 10);
+    const lastWeekMessages = messages.filter(({
+        date
+    }) => now - date < 7 * 24 * 60 * 60 * 1000);
+    const authorActivity = lastWeekMessages.reduce((acc, msg) => ({ ...acc,
+        [msg.author]: (acc[msg.author] || 0) + 1
+    }), {});
+    const authorActivityArray = Object.keys(authorActivity).map(author => ({
+        author,
+        messages: authorActivity[author]
+    }));
+    const ranking = authorActivityArray.sort(({
+        messages: a
+    }, {
+        messages: b
+    }) => b - a).slice(0, 10);
+    // Add author name, avatar, nickname and other
+    const sddMembers = bot.guilds.get('186941943941562369').members;
+    const rankingWithAuthorInfo = ranking.map(({
+        author,
+        messages
+    }) => ({
+        author,
+        messages,
+        id: sddMembers.get(author).user.username,
+        nickname: sddMembers.get(author).displayName,
+        avatar: sddMembers.get(author).user.avatarURL
+    }));
     process.stdout.write('Writing \x1b[32m./lastWeekStats.json\x1b[0m\t');
-    fs.writeFileSync('./lastWeekStats.json', JSON.stringify(ranking));
+    fs.writeFileSync('./lastWeekStats.json', JSON.stringify(rankingWithAuthorInfo));
     console.log('DONE');
     displayRanking(ranking);
 };
@@ -135,24 +160,55 @@ const doStats = (channels) => {
  * @param {Object[]} ranking the ranking as an ordered array of authors and their amount of messages
  */
 const displayRanking = ranking => {
-    const sddMembers = client.guilds.get('186941943941562369').members;
-    const rankingWithUsername = ranking.reduce((acc, {author, messages}) => {
+    const sddMembers = bot.guilds.get('186941943941562369').members;
+    const rankingWithUsername = ranking.reduce((acc, {
+        author,
+        messages
+    }) => {
         const member = sddMembers.get(author);
         return [...acc, [member.nickname || member.user.username, messages]];
     }, []);
-    const maxLength = Math.max(...rankingWithUsername.map(el=>el[0].length)) + 2;
-    const maxAmount = Math.max(...rankingWithUsername.map(el=>el[1]));
+    const maxLength = Math.max(...rankingWithUsername.map(el => el[0].length)) + 2;
+    const maxAmount = Math.max(...rankingWithUsername.map(el => el[1]));
     console.log('┌' + '─'.repeat(maxLength) + '┬' + '─'.repeat(maxAmount.toString().length + 2) + '┐');
     const verticalDelimiter = '│';
     rankingWithUsername.forEach(([username, messages]) => {
-        console.log(verticalDelimiter
-            + ' '.repeat(Math.floor((maxLength-username.length)/2))
-            + username
-            + ' '.repeat(Math.ceil((maxLength-username.length)/2))
-            + verticalDelimiter + ' '
-            + messages
-            + ' '.repeat(maxAmount.toString().length - messages.toString().length + 1)
-            + verticalDelimiter);
+        console.log(verticalDelimiter +
+            ' '.repeat(Math.floor((maxLength - username.length) / 2)) +
+            username +
+            ' '.repeat(Math.ceil((maxLength - username.length) / 2)) +
+            verticalDelimiter + ' ' +
+            messages +
+            ' '.repeat(maxAmount.toString().length - messages.toString().length + 1) +
+            verticalDelimiter);
     });
     console.log('└' + '─'.repeat(maxLength) + '┴' + '─'.repeat(maxAmount.toString().length + 2) + '┘');
+};
+
+user.on('ready', () => {
+    user.guilds.first().fetchMembers().then(guild => doMembers(guild));
+});
+
+/**
+ * Saves a list of members and some informations about them
+ *
+ * @param {Discord.Guild} guild the guild with members fetched.
+ */
+const doMembers = (guild) => {
+    const membersInfoPromise = guild.members.filter(member => !member.user.bot).map(member =>
+        member.user.fetchProfile().then(results => ({
+            joined: member.joinedTimestamp,
+            highestRoleName: member.highestRole.name,
+            id: member.id,
+            name: member.user.username,
+            nickname: member.displayName,
+            connections: results.connections.map(({type, name}) => ({type, name}))
+        })).catch(error => console.log(error))
+    );
+    Promise.all(membersInfoPromise).then(results => {
+        process.stdout.write('Writing \x1b[32m./membersInfos.json\x1b[0m\t');
+        fs.writeFileSync('./membersInfos.json', JSON.stringify(results));
+        console.log('DONE');
+        bot.login(tokens.bot);
+    });
 };
